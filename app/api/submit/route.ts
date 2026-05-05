@@ -12,12 +12,17 @@ export async function POST(req: Request) {
 
     const payload = await req.json();
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45000);
+
     const gasRes = await fetch(gasUrl, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload),
       cache: "no-store",
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
 
     const text = await gasRes.text();
     let data: unknown = text;
@@ -34,11 +39,13 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, data });
   } catch (error) {
+    const details = error instanceof Error ? error.message : String(error);
+    const timedOut = details.toLowerCase().includes("aborted");
     return NextResponse.json(
       {
         ok: false,
-        error: "Error interno en el endpoint de envio",
-        details: error instanceof Error ? error.message : String(error),
+        error: timedOut ? "Timeout al enviar al webhook de Google Apps Script." : "Error interno en el endpoint de envio",
+        details,
       },
       { status: 500 }
     );

@@ -27,26 +27,34 @@ function doPost(e) {
     let regDorsoUrl = '';
 
     if (normalizeChoice_(payload.registro_profesional) !== 'no') {
-      dniFrenteUrl = saveBase64Image_(
-        payload.documentos?.dni_frente,
-        `dni_frente_${safeSlug_(payload.nombre_apellido)}.jpg`,
-        candidateFolder
-      );
-      dniDorsoUrl = saveBase64Image_(
-        payload.documentos?.dni_dorso,
-        `dni_dorso_${safeSlug_(payload.nombre_apellido)}.jpg`,
-        candidateFolder
-      );
-      regFrenteUrl = saveBase64Image_(
-        payload.documentos?.registro_frente,
-        `registro_frente_${safeSlug_(payload.nombre_apellido)}.jpg`,
-        candidateFolder
-      );
-      regDorsoUrl = saveBase64Image_(
-        payload.documentos?.registro_dorso,
-        `registro_dorso_${safeSlug_(payload.nombre_apellido)}.jpg`,
-        candidateFolder
-      );
+      if (payload.documentos?.dni_frente) {
+        dniFrenteUrl = saveBase64Image_(
+          payload.documentos.dni_frente,
+          `dni_frente_${safeSlug_(payload.nombre_apellido)}.jpg`,
+          candidateFolder
+        );
+      }
+      if (payload.documentos?.dni_dorso) {
+        dniDorsoUrl = saveBase64Image_(
+          payload.documentos.dni_dorso,
+          `dni_dorso_${safeSlug_(payload.nombre_apellido)}.jpg`,
+          candidateFolder
+        );
+      }
+      if (payload.documentos?.registro_frente) {
+        regFrenteUrl = saveBase64Image_(
+          payload.documentos.registro_frente,
+          `registro_frente_${safeSlug_(payload.nombre_apellido)}.jpg`,
+          candidateFolder
+        );
+      }
+      if (payload.documentos?.registro_dorso) {
+        regDorsoUrl = saveBase64Image_(
+          payload.documentos.registro_dorso,
+          `registro_dorso_${safeSlug_(payload.nombre_apellido)}.jpg`,
+          candidateFolder
+        );
+      }
     }
 
     const sheet = getOrCreateSheet_(CONFIG.SHEET_NAME);
@@ -102,15 +110,7 @@ function validatePayload(payload) {
   if (!payload.edad) throw new Error('Falta el campo edad.');
   if (!payload.registro_profesional) throw new Error('Falta el campo registro_profesional.');
 
-  if (normalizeChoice_(payload.registro_profesional) === 'no') {
-    return;
-  }
-
-  const docs = payload.documentos || {};
-  const requiredDocs = ['dni_frente', 'dni_dorso', 'registro_frente', 'registro_dorso'];
-  requiredDocs.forEach(function (k) {
-    if (!docs[k]) throw new Error('Falta el documento obligatorio: ' + k);
-  });
+  // La carga de documentos es opcional.
 }
 
 function computeEstado_(payload) {

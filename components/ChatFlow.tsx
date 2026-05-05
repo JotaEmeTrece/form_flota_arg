@@ -48,6 +48,8 @@ type ChatMessage = {
 };
 
 const SUBMIT_ENDPOINT = "/api/submit";
+const MAX_IMAGE_SIZE_MB = 10;
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/jpg", "image/webp", "image/heic", "image/heif"]);
 
 const CAMPOS: Campo[] = [
   { key: "nombre_apellido", pregunta: "¿Cual es tu nombre y apellido?", tipo: "text", placeholder: "Nombre completo", required: true },
@@ -83,7 +85,7 @@ const CAMPOS: Campo[] = [
   { key: "zona_segura", pregunta: "¿Consideras que la zona es segura?", tipo: "options", opciones: [{ label: "Si", value: "Si" }, { label: "No", value: "No" }, { label: "Dudosa", value: "Dudosa" }], required: true },
   { key: "disponibilidad_horaria_semanal", pregunta: "¿Cual es tu disponibilidad horaria semanal?", tipo: "text", placeholder: "Ej: Lunes a sabado de 18 a 6", required: true },
   { key: "disponibilidad_inicio", pregunta: "¿Podes empezar pronto? ¿Desde cuando?", tipo: "text", placeholder: "Ej: Si, desde la semana que viene", required: true },
-  { key: "documentos", pregunta: "Subi las 4 fotos requeridas: DNI frente y dorso + Registro frente y dorso.", tipo: "file", required: true, dependsOnRegistroSi: true }
+  { key: "documentos", pregunta: "Carga de documentos (opcional): DNI frente/dorso y Registro frente/dorso.", tipo: "file", required: false, dependsOnRegistroSi: true }
 ];
 
 const INITIAL_FORM: FormDataState = {
@@ -98,6 +100,43 @@ function fileToBase64(file: File): Promise<string> {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+function validateImageFile(file: File) {
+  if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+    throw new Error("Solo se permiten imagenes (JPG, PNG, WEBP, HEIC).");
+  }
+  const maxBytes = MAX_IMAGE_SIZE_MB * 1024 * 1024;
+  if (file.size > maxBytes) {
+    throw new Error(`Cada imagen debe pesar menos de ${MAX_IMAGE_SIZE_MB}MB.`);
+  }
+}
+
+async function compressImageToBase64(file: File): Promise<string> {
+  validateImageFile(file);
+  const dataUrl = await fileToBase64(file);
+  if (!file.type.startsWith("image/")) return dataUrl;
+
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error("No se pudo procesar la imagen."));
+    el.src = dataUrl;
+  });
+
+  const maxW = 1600;
+  const ratio = img.width > maxW ? maxW / img.width : 1;
+  const width = Math.max(1, Math.round(img.width * ratio));
+  const height = Math.max(1, Math.round(img.height * ratio));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return dataUrl;
+  ctx.drawImage(img, 0, 0, width, height);
+
+  return canvas.toDataURL("image/jpeg", 0.78);
 }
 
 function normalizeChoice(value: string): string {
@@ -153,10 +192,7 @@ export default function ChatFlow() {
     if (!campoActual) return false;
     if (campoActual.tipo === "options") return true;
     if (campoActual.tipo === "select") return true;
-    if (campoActual.tipo === "file") {
-      const d = form.documentos;
-      return Boolean(d.dni_frente && d.dni_dorso && d.registro_frente && d.registro_dorso);
-    }
+    if (campoActual.tipo === "file") return true;
     return inputValue.trim().length > 0;
   }, [campoActual, form.documentos, inputValue]);
 
@@ -261,13 +297,12 @@ export default function ChatFlow() {
 
       if (registroSi) {
         const docs = snapshot.documentos;
-        if (!docs.dni_frente || !docs.dni_dorso || !docs.registro_frente || !docs.registro_dorso) {
-          throw new Error("Faltan fotos obligatorias de documentacion.");
-        }
-        const [dniFrente64, dniDorso64, regFrente64, regDorso64] = await Promise.all([
-          fileToBase64(docs.dni_frente), fileToBase64(docs.dni_dorso), fileToBase64(docs.registro_frente), fileToBase64(docs.registro_dorso)
-        ]);
-        docsPayload = { dni_frente: dniFrente64, dni_dorso: dniDorso64, registro_frente: regFrente64, registro_dorso: regDorso64 };
+        docsPayload = {
+          dni_frente: docs.dni_frente ? await compressImageToBase64(docs.dni_frente) : "",
+          dni_dorso: docs.dni_dorso ? await compressImageToBase64(docs.dni_dorso) : "",
+          registro_frente: docs.registro_frente ? await compressImageToBase64(docs.registro_frente) : "",
+          registro_dorso: docs.registro_dorso ? await compressImageToBase64(docs.registro_dorso) : "",
+        };
       }
 
       const payload = {
@@ -458,8 +493,8 @@ export default function ChatFlow() {
                   <InputFile label="Registro frente" onChange={(f) => setForm((p) => ({ ...p, documentos: { ...p.documentos, registro_frente: f } }))} />
                   <InputFile label="Registro dorso" onChange={(f) => setForm((p) => ({ ...p, documentos: { ...p.documentos, registro_dorso: f } }))} />
                 </div>
-                <p className="mt-2 text-xs text-slate-500">Tenes que cargar las 4 fotos para continuar.</p>
-                <button type="button" onClick={() => avanzar()} disabled={!canContinue || loading} className="mt-3 w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                <p className="mt-2 text-xs text-slate-500">La carga de documentos es opcional.</p>
+                <button type="button" onClick={() => avanzar()} disabled={loading} className="mt-3 w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
                   {loading ? "Enviando..." : "Finalizar y enviar"}
                 </button>
               </>
