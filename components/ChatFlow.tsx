@@ -134,6 +134,7 @@ export default function ChatFlow() {
   ]);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [distanceRejected, setDistanceRejected] = useState(false);
   const [error, setError] = useState("");
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLDivElement | null>(null);
@@ -236,7 +237,10 @@ export default function ChatFlow() {
         pushUserAndNext(value, CAMPOS.length);
         setForm(newForm);
         setInputValue("");
-        await enviarFormulario(newForm);
+        setDistanceRejected(true);
+        if (GAS_WEBHOOK_URL) {
+          await enviarFormulario(newForm);
+        }
         return;
       }
     }
@@ -309,6 +313,17 @@ export default function ChatFlow() {
       setLoading(false);
     }
   };
+
+  if (distanceRejected) {
+    return (
+      <section className="mx-auto w-full max-w-2xl rounded-2xl bg-white p-6 shadow-lg">
+        <h1 className="text-2xl font-semibold text-slate-900">Resultado de preseleccion</h1>
+        <p className="mt-2 text-slate-600">
+          Gracias por tu tiempo. En esta etapa estamos priorizando perfiles a 30 minutos o menos del punto de encuentro.
+        </p>
+      </section>
+    );
+  }
 
   if (done) {
     return (
