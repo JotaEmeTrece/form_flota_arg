@@ -165,12 +165,13 @@ export default function ChatFlow() {
     setMessages(nextMessages);
   };
 
-  const avanzar = async (forcedValue?: string) => {
+  const avanzar = async (forcedValue?: string | unknown) => {
     if (!campoActual || loading) return;
     setError("");
+    const safeForcedValue = typeof forcedValue === "string" ? forcedValue : undefined;
 
     if (campoActual.tipo === "options") {
-      const value = String(forcedValue || "").trim();
+      const value = String(safeForcedValue || "").trim();
       if (!value) return;
       const newForm = { ...form, [campoActual.key]: value } as FormDataState;
       setForm(newForm);
@@ -186,7 +187,7 @@ export default function ChatFlow() {
     }
 
     if (campoActual.tipo === "select") {
-      const value = String(forcedValue || "").trim();
+      const value = String(safeForcedValue || "").trim();
       if (!value) return;
       const newForm = { ...form, [campoActual.key]: value } as FormDataState;
       setForm(newForm);
@@ -447,7 +448,7 @@ export default function ChatFlow() {
                   <InputFile label="Registro dorso" onChange={(f) => setForm((p) => ({ ...p, documentos: { ...p.documentos, registro_dorso: f } }))} />
                 </div>
                 <p className="mt-2 text-xs text-slate-500">Tenes que cargar las 4 fotos para continuar.</p>
-                <button type="button" onClick={avanzar} disabled={!canContinue || loading} className="mt-3 w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                <button type="button" onClick={() => avanzar()} disabled={!canContinue || loading} className="mt-3 w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
                   {loading ? "Enviando..." : "Finalizar y enviar"}
                 </button>
               </>
