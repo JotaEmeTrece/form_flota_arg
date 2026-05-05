@@ -47,7 +47,7 @@ type ChatMessage = {
   text: string;
 };
 
-const GAS_WEBHOOK_URL = process.env.NEXT_PUBLIC_GAS_WEBHOOK_URL || "";
+const SUBMIT_ENDPOINT = "/api/submit";
 
 const CAMPOS: Campo[] = [
   { key: "nombre_apellido", pregunta: "¿Cual es tu nombre y apellido?", tipo: "text", placeholder: "Nombre completo", required: true },
@@ -238,9 +238,7 @@ export default function ChatFlow() {
         setForm(newForm);
         setInputValue("");
         setDistanceRejected(true);
-        if (GAS_WEBHOOK_URL) {
-          await enviarFormulario(newForm);
-        }
+        await enviarFormulario(newForm);
         return;
       }
     }
@@ -258,8 +256,6 @@ export default function ChatFlow() {
     setLoading(true);
     setError("");
     try {
-      if (!GAS_WEBHOOK_URL) throw new Error("Configuracion pendiente: falta NEXT_PUBLIC_GAS_WEBHOOK_URL en .env.local");
-
       const registroSi = normalizeChoice(snapshot.registro_profesional) === "si";
       let docsPayload = { dni_frente: "", dni_dorso: "", registro_frente: "", registro_dorso: "" };
 
@@ -299,7 +295,7 @@ export default function ChatFlow() {
         documentos: docsPayload
       };
 
-      const res = await fetch(GAS_WEBHOOK_URL, {
+      const res = await fetch(SUBMIT_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -512,3 +508,4 @@ function InputFile({ label, onChange }: { label: string; onChange: (file: File |
     </div>
   );
 }
+
