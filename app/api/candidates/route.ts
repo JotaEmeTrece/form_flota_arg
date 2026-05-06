@@ -6,7 +6,15 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const since = searchParams.get("since");
 
-  const rowsRes = await db.execute("SELECT * FROM candidates ORDER BY id DESC");
+  const rowsRes = await db.execute(`
+    SELECT
+      id, created_at, estado, estado_motivo, nombre_apellido, edad, zona,
+      distancia_punto_encuentro, registro_profesional, categoria_registro,
+      registro_vencimiento, experiencia_apps, turno_preferencia, cochera,
+      tipo_calle, zona_segura, disponibilidad_horaria_semanal, disponibilidad_inicio
+    FROM candidates
+    ORDER BY id DESC
+  `);
   const rows = rowsRes.rows as Array<Record<string, unknown>>;
 
   let newCount = rows.length;

@@ -6,6 +6,7 @@ type Candidate = {
   id: number;
   created_at: string;
   estado: string;
+  estado_motivo: string;
   nombre_apellido: string;
   edad: string;
   zona: string;
@@ -53,6 +54,7 @@ export default function AdminCandidatosPage() {
               <th className="p-2 text-left">Nombre</th>
               <th className="p-2 text-left">Edad</th>
               <th className="p-2 text-left">Zona</th>
+              <th className="p-2 text-left">Motivo</th>
             </tr>
           </thead>
           <tbody>
@@ -63,6 +65,7 @@ export default function AdminCandidatosPage() {
                 <td className="p-2">{it.nombre_apellido}</td>
                 <td className="p-2">{it.edad}</td>
                 <td className="p-2">{it.zona}</td>
+                <td className="p-2">{it.estado_motivo}</td>
               </tr>
             ))}
           </tbody>

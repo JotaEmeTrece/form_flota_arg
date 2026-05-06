@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS candidates (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   created_at TEXT NOT NULL,
   estado TEXT NOT NULL,
+  estado_motivo TEXT NOT NULL DEFAULT '',
   nombre_apellido TEXT NOT NULL,
   edad TEXT NOT NULL,
   zona TEXT NOT NULL,
@@ -38,6 +39,11 @@ CREATE TABLE IF NOT EXISTS candidates (
   registro_dorso TEXT
 );
 `);
+  const colsRes = await db.execute("PRAGMA table_info(candidates)");
+  const colNames = new Set((colsRes.rows || []).map((r) => String((r as Record<string, unknown>).name || "")));
+  if (!colNames.has("estado_motivo")) {
+    await db.execute("ALTER TABLE candidates ADD COLUMN estado_motivo TEXT NOT NULL DEFAULT ''");
+  }
   initialized = true;
 }
 
@@ -71,28 +77,49 @@ function extractMinutes(value: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function docsCount(input: CandidateInput): number {
+  let n = 0;
+  if (input.documentos?.dni_frente) n++;
+  if (input.documentos?.dni_dorso) n++;
+  if (input.documentos?.registro_frente) n++;
+  if (input.documentos?.registro_dorso) n++;
+  return n;
+}
+
 export function computeEstado(input: CandidateInput): "No Apto" | "Revisar" | "Apto" {
   const mins = extractMinutes(input.distancia_punto_encuentro || "");
   if (mins !== null && mins > 30) return "No Apto";
-  return "Revisar";
+  return docsCount(input) >= 4 ? "Apto" : "Revisar";
+}
+
+export function computeEstadoMotivo(input: CandidateInput, estado: "No Apto" | "Revisar" | "Apto"): string {
+  const count = docsCount(input);
+  if (estado === "No Apto") return "No apto: Vive a mas de 30 min de distancia.";
+  if (estado === "Revisar") {
+    if (count === 0) return "Revisar: Cumple con todos los requisitos aunque no cargo documentos.";
+    return "Revisar: Cumple requisitos, pero no cargo toda la documentacion.";
+  }
+  return "Apto: Cumple en su totalidad con los requisitos y cargo documentos.";
 }
 
 export async function createCandidate(input: CandidateInput) {
   await ensureSchema();
   const estado = computeEstado(input);
+  const estadoMotivo = computeEstadoMotivo(input, estado);
   const now = new Date().toISOString();
   await db.execute({
     sql: `
       INSERT INTO candidates (
-        created_at, estado, nombre_apellido, edad, zona, distancia_punto_encuentro,
+        created_at, estado, estado_motivo, nombre_apellido, edad, zona, distancia_punto_encuentro,
         registro_profesional, categoria_registro, registro_vencimiento, experiencia_apps,
         turno_preferencia, cochera, tipo_calle, zona_segura, disponibilidad_horaria_semanal,
         disponibilidad_inicio, dni_frente, dni_dorso, registro_frente, registro_dorso
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     args: [
       now,
       estado,
+      estadoMotivo,
       input.nombre_apellido || "",
       String(input.edad ?? ""),
       input.zona || "",
@@ -107,10 +134,10 @@ export async function createCandidate(input: CandidateInput) {
       input.zona_segura || "",
       input.disponibilidad_horaria_semanal || "",
       input.disponibilidad_inicio || "",
-      input.documentos?.dni_frente || "",
-      input.documentos?.dni_dorso || "",
-      input.documentos?.registro_frente || "",
-      input.documentos?.registro_dorso || "",
+      "",
+      "",
+      "",
+      "",
     ],
   });
 

@@ -93,15 +93,6 @@ const INITIAL_FORM: FormDataState = {
   documentos: { dni_frente: null, dni_dorso: null, registro_frente: null, registro_dorso: null }
 };
 
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
 function validateImageFile(file: File) {
   if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
     throw new Error("Solo se permiten imagenes (JPG, PNG, WEBP, HEIC).");
@@ -110,33 +101,6 @@ function validateImageFile(file: File) {
   if (file.size > maxBytes) {
     throw new Error(`Cada imagen debe pesar menos de ${MAX_IMAGE_SIZE_MB}MB.`);
   }
-}
-
-async function compressImageToBase64(file: File): Promise<string> {
-  validateImageFile(file);
-  const dataUrl = await fileToBase64(file);
-  if (!file.type.startsWith("image/")) return dataUrl;
-
-  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const el = new Image();
-    el.onload = () => resolve(el);
-    el.onerror = () => reject(new Error("No se pudo procesar la imagen."));
-    el.src = dataUrl;
-  });
-
-  const maxW = 1600;
-  const ratio = img.width > maxW ? maxW / img.width : 1;
-  const width = Math.max(1, Math.round(img.width * ratio));
-  const height = Math.max(1, Math.round(img.height * ratio));
-
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return dataUrl;
-  ctx.drawImage(img, 0, 0, width, height);
-
-  return canvas.toDataURL("image/jpeg", 0.78);
 }
 
 function normalizeChoice(value: string): string {
@@ -292,19 +256,6 @@ export default function ChatFlow() {
     setLoading(true);
     setError("");
     try {
-      const registroSi = normalizeChoice(snapshot.registro_profesional) === "si";
-      let docsPayload = { dni_frente: "", dni_dorso: "", registro_frente: "", registro_dorso: "" };
-
-      if (registroSi) {
-        const docs = snapshot.documentos;
-        docsPayload = {
-          dni_frente: docs.dni_frente ? await compressImageToBase64(docs.dni_frente) : "",
-          dni_dorso: docs.dni_dorso ? await compressImageToBase64(docs.dni_dorso) : "",
-          registro_frente: docs.registro_frente ? await compressImageToBase64(docs.registro_frente) : "",
-          registro_dorso: docs.registro_dorso ? await compressImageToBase64(docs.registro_dorso) : "",
-        };
-      }
-
       const payload = {
         nombre_apellido: snapshot.nombre_apellido,
         edad: Number(snapshot.edad) || snapshot.edad,
@@ -327,13 +278,19 @@ export default function ChatFlow() {
         distancia_punto_encuentro: snapshot.distancia_punto_encuentro,
         disponibilidad_horaria_semanal: snapshot.disponibilidad_horaria_semanal,
         disponibilidad_inicio: snapshot.disponibilidad_inicio,
-        documentos: docsPayload
+        documentos: {}
       };
+
+      const formData = new FormData();
+      formData.append("payload", JSON.stringify(payload));
+      if (snapshot.documentos.dni_frente) formData.append("dni_frente", snapshot.documentos.dni_frente);
+      if (snapshot.documentos.dni_dorso) formData.append("dni_dorso", snapshot.documentos.dni_dorso);
+      if (snapshot.documentos.registro_frente) formData.append("registro_frente", snapshot.documentos.registro_frente);
+      if (snapshot.documentos.registro_dorso) formData.append("registro_dorso", snapshot.documentos.registro_dorso);
 
       const res = await fetch(SUBMIT_ENDPOINT, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: formData
       });
 
       if (!res.ok) throw new Error("No se pudo enviar el formulario.");
@@ -521,9 +478,17 @@ function InputFile({ label, onChange }: { label: string; onChange: (file: File |
   const [selectedName, setSelectedName] = useState("");
 
   const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    onChange(file);
-    setSelectedName(file ? file.name : "");
+    try {
+      const file = e.target.files?.[0] || null;
+      if (file) validateImageFile(file);
+      onChange(file);
+      setSelectedName(file ? file.name : "");
+    } catch (err) {
+      onChange(null);
+      setSelectedName("");
+      const msg = err instanceof Error ? err.message : "Archivo invalido.";
+      if (typeof window !== "undefined") window.alert(msg);
+    }
   };
 
   return (
