@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import imageCompression from "browser-image-compression";
 
 type Opcion = { label: string; value: string };
 type CampoTipo = "text" | "number" | "date" | "file" | "options" | "select";
@@ -281,17 +282,35 @@ export default function ChatFlow() {
         documentos: {}
       };
 
-      const formData = new FormData();
-      formData.append("payload", JSON.stringify(payload));
-      if (snapshot.documentos.dni_frente) formData.append("dni_frente", snapshot.documentos.dni_frente);
-      if (snapshot.documentos.dni_dorso) formData.append("dni_dorso", snapshot.documentos.dni_dorso);
-      if (snapshot.documentos.registro_frente) formData.append("registro_frente", snapshot.documentos.registro_frente);
-      if (snapshot.documentos.registro_dorso) formData.append("registro_dorso", snapshot.documentos.registro_dorso);
+      const doc = snapshot.documentos;
+      const hayImagenes = doc.dni_frente || doc.dni_dorso || doc.registro_frente || doc.registro_dorso;
 
-      const res = await fetch(SUBMIT_ENDPOINT, {
-        method: "POST",
-        body: formData
-      });
+      let requestOptions: RequestInit;
+
+      if (hayImagenes) {
+        const formData = new FormData();
+        formData.append("payload", JSON.stringify(payload));
+
+        const options = { maxSizeMB: 0.8, maxWidthOrHeight: 1280, useWebWorker: true };
+
+        if (doc.dni_frente) formData.append("dni_frente", await imageCompression(doc.dni_frente, options));
+        if (doc.dni_dorso) formData.append("dni_dorso", await imageCompression(doc.dni_dorso, options));
+        if (doc.registro_frente) formData.append("registro_frente", await imageCompression(doc.registro_frente, options));
+        if (doc.registro_dorso) formData.append("registro_dorso", await imageCompression(doc.registro_dorso, options));
+
+        requestOptions = {
+          method: "POST",
+          body: formData
+        };
+      } else {
+        requestOptions = {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        };
+      }
+
+      const res = await fetch(SUBMIT_ENDPOINT, requestOptions);
 
       if (!res.ok) throw new Error("No se pudo enviar el formulario.");
       setDone(true);
@@ -508,4 +527,3 @@ function InputFile({ label, onChange }: { label: string; onChange: (file: File |
     </div>
   );
 }
-

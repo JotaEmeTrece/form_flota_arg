@@ -103,11 +103,13 @@ export function computeEstadoMotivo(input: CandidateInput, estado: "No Apto" | "
 }
 
 export async function createCandidate(input: CandidateInput) {
-  await ensureSchema();
+  // Aca quitamos el await ensureSchema()
   const estado = computeEstado(input);
   const estadoMotivo = computeEstadoMotivo(input, estado);
   const now = new Date().toISOString();
-  await db.execute({
+  
+  // Usamos RETURNING id para hacerlo todo en una sola query rapida
+  const result = await db.execute({
     sql: `
       INSERT INTO candidates (
         created_at, estado, estado_motivo, nombre_apellido, edad, zona, distancia_punto_encuentro,
@@ -115,6 +117,7 @@ export async function createCandidate(input: CandidateInput) {
         turno_preferencia, cochera, tipo_calle, zona_segura, disponibilidad_horaria_semanal,
         disponibilidad_inicio, dni_frente, dni_dorso, registro_frente, registro_dorso
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      RETURNING id
     `,
     args: [
       now,
@@ -141,7 +144,6 @@ export async function createCandidate(input: CandidateInput) {
     ],
   });
 
-  const idRow = await db.execute("SELECT last_insert_rowid() as id");
-  const id = idRow.rows[0]?.id ?? null;
+  const id = result.rows[0]?.id ?? null;
   return { id, estado };
 }

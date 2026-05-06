@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { db, ensureSchema } from "@/lib/db";
+import { db } from "@/lib/db"; // Quitamos el import de ensureSchema
 
 export async function GET(req: Request) {
-  await ensureSchema();
   const { searchParams } = new URL(req.url);
   const since = searchParams.get("since");
 

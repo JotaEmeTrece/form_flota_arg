@@ -1,4 +1,4 @@
-import { db, ensureSchema } from "@/lib/db";
+import { db } from "@/lib/db"; // Quitamos el import de ensureSchema
 
 function csvEscape(value: unknown) {
   const s = String(value ?? "").replace(/"/g, '""');
@@ -6,7 +6,6 @@ function csvEscape(value: unknown) {
 }
 
 export async function GET() {
-  await ensureSchema();
   const rowsRes = await db.execute(`
     SELECT
       id, created_at, estado, nombre_apellido, edad, zona, distancia_punto_encuentro,
