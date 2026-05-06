@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db"; // Quitamos el import de ensureSchema
+import { db } from "@/lib/db";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -26,4 +26,23 @@ export async function GET(req: Request) {
   }
 
   return NextResponse.json({ ok: true, items: rows, newCount });
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const { ids } = await req.json();
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json({ ok: false, error: "No se enviaron IDs" }, { status: 400 });
+    }
+
+    const placeholders = ids.map(() => "?").join(",");
+    await db.execute({
+      sql: `DELETE FROM candidates WHERE id IN (${placeholders})`,
+      args: ids,
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return NextResponse.json({ ok: false, error: String(error) }, { status: 500 });
+  }
 }
